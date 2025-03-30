@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech to Speech Translator</title>
+</head>
+<body>
+    <h1>Speech to Speech Translator</h1>
+    <form id="translator-form">
+        <label for="input-language">Input Language:</label>
+        <select id="input-language" name="input-language">
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <!-- Add more languages here -->
+        </select>
+        <br>
+        <label for="output-language">Output Language:</label>
+        <select id="output-language" name="output-language">
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <!-- Add more languages here -->
+        </select>
+        <br>
+        <button type="submit">Translate</button>
+    </form>
+    <div id="output"></div>
+    <script>
+        // JavaScript to handle form submission and call the translation model
+        document.getElementById('translator-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            // Add logic to call the speech translation model
+        });
+    </script>
+</body>
+</html>
