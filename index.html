@@ -4,6 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Speech to Speech Translator</title>
+    <style>
+        .history-section {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .history-item {
+            margin: 5px 0;
+            padding: 5px;
+            background-color: #f9f9f9;
+        }
+    </style>
 </head>
 <body>
     <h1>Speech to Speech Translator</h1>
@@ -13,6 +26,8 @@
             <option value="en">English</option>
             <option value="es">Spanish</option>
             <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="it">Italian</option>
             <!-- Add more languages here -->
         </select>
         <br>
@@ -21,18 +36,55 @@
             <option value="en">English</option>
             <option value="es">Spanish</option>
             <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="it">Italian</option>
             <!-- Add more languages here -->
         </select>
         <br>
         <button type="submit">Translate</button>
     </form>
     <div id="output"></div>
+    
+    <div class="history-section">
+        <h2>Translation History</h2>
+        <div id="translation-history"></div>
+    </div>
+
     <script>
+        // Store translation history
+        let translationHistory = [];
+
         // JavaScript to handle form submission and call the translation model
         document.getElementById('translator-form').addEventListener('submit', function(event) {
             event.preventDefault();
+            
+            const inputLang = document.getElementById('input-language').value;
+            const outputLang = document.getElementById('output-language').value;
+            
+            // Add to history
+            const timestamp = new Date().toLocaleString();
+            const historyItem = {
+                timestamp: timestamp,
+                from: inputLang,
+                to: outputLang
+            };
+            
+            translationHistory.unshift(historyItem);
+            updateHistoryDisplay();
+            
             // Add logic to call the speech translation model
+            console.log(`Translating from ${inputLang} to ${outputLang}`);
         });
+
+        function updateHistoryDisplay() {
+            const historyDiv = document.getElementById('translation-history');
+            historyDiv.innerHTML = translationHistory.map(item => `
+                <div class="history-item">
+                    <strong>${item.timestamp}</strong><br>
+                    From: ${item.from} → To: ${item.to}
+                </div>
+            `).join('');
+        }
     </script>
 </body>
 </html>
