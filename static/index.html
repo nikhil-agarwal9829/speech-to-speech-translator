@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech to Speech Translator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .controls {
+            margin: 20px 0;
+            text-align: center;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .history-section {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .history-item {
+            margin: 5px 0;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .status.recording {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        .status.processing {
+            background-color: #e3f2fd;
+            color: #1565c0;
+        }
+        select {
+            padding: 8px;
+            margin: 5px;
+            font-size: 16px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        audio {
+            width: 100%;
+            margin: 10px 0;
+        }
+        /* New styles for microphone level indicator */
+        .mic-level {
+            width: 300px;
+            height: 20px;
+            background-color: #eee;
+            border-radius: 10px;
+            margin: 10px auto;
+            overflow: hidden;
+            display: none;
+        }
+        .mic-level-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #4CAF50;
+            transition: width 0.1s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Speech to Speech Translator</h1>
+        <div class="controls">
+            <select id="input-language">
+                <option value="en">English</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="it">Italian</option>
+                <option value="ja">Japanese</option>
+                <option value="ko">Korean</option>
+                <option value="ru">Russian</option>
+            </select>
+            <select id="output-language">
+                <option value="hi">Hindi</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="it">Italian</option>
+                <option value="ja">Japanese</option>
+                <option value="ko">Korean</option>
+                <option value="ru">Russian</option>
+            </select>
+            <button id="recordButton">Start Recording</button>
+            <button id="stopButton" disabled>Stop Recording</button>
+        </div>
+        <div class="mic-level">
+            <div class="mic-level-bar"></div>
+        </div>
+        <div id="status" class="status"></div>
+        <div id="output"></div>
+        
+        <div class="history-section">
+            <h2>Translation History</h2>
+            <div id="translation-history"></div>
+        </div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let translationHistory = [];
+        let audioContext;
+        let analyser;
+        let microphone;
+        let animationFrame;
+
+        const recordButton = document.getElementById('recordButton');
+        const stopButton = document.getElementById('stopButton');
+        const statusDiv = document.getElementById('status');
+        const outputDiv = document.getElementById('output');
+        const historyDiv = document.getElementById('translation-history');
+        const micLevel = document.querySelector('.mic-level');
+        const micLevelBar = document.querySelector('.mic-level-bar');
+
+        recordButton.addEventListener('click', startRecording);
+        stopButton.addEventListener('click', stopRecording);
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                // Set up audio analysis
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+                analyser.fftSize = 256;
+                
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                
+                micLevel.style.display = 'block';
+                
+                function updateMicLevel() {
+                    analyser.getByteFrequencyData(dataArray);
+                    const average = dataArray.reduce((a, b) => a + b) / bufferLength;
+                    const level = (average / 255) * 100;
+                    micLevelBar.style.width = `${level}%`;
+                    animationFrame = requestAnimationFrame(updateMicLevel);
+                }
+                
+                updateMicLevel();
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.start();
+                recordButton.disabled = true;
+                stopButton.disabled = false;
+                statusDiv.textContent = 'Recording...';
+                statusDiv.className = 'status recording';
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+                statusDiv.textContent = 'Error accessing microphone';
+            }
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            recordButton.disabled = false;
+            stopButton.disabled = true;
+            statusDiv.textContent = 'Processing...';
+            statusDiv.className = 'status processing';
+            
+            // Stop microphone level visualization
+            cancelAnimationFrame(animationFrame);
+            micLevel.style.display = 'none';
+            micLevelBar.style.width = '0%';
+            
+            if (audioContext) {
+                audioContext.close();
+            }
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                await sendAudioForTranslation(audioBlob);
+            };
+        }
+
+        async function sendAudioForTranslation(audioBlob) {
+            const formData = new FormData();
+            formData.append('audio', audioBlob);
+            formData.append('target_lang', document.getElementById('output-language').value);
+
+            try {
+                const response = await fetch('/translate', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // Add to history
+                const timestamp = new Date().toLocaleString();
+                const historyItem = {
+                    timestamp: timestamp,
+                    original: data.original_text,
+                    translated: data.translated_text,
+                    audio: data.audio_url
+                };
+                
+                translationHistory.unshift(historyItem);
+                updateHistoryDisplay();
+
+                // Display current translation
+                outputDiv.innerHTML = `
+                    <h3>Current Translation:</h3>
+                    <p><strong>Original:</strong> ${data.original_text}</p>
+                    <p><strong>Translated:</strong> ${data.translated_text}</p>
+                    <audio controls src="${data.audio_url}"></audio>
+                `;
+
+                statusDiv.textContent = 'Translation complete!';
+                statusDiv.className = 'status';
+            } catch (error) {
+                console.error('Translation error:', error);
+                statusDiv.textContent = `Error: ${error.message}`;
+                statusDiv.className = 'status';
+            }
+        }
+
+        function updateHistoryDisplay() {
+            historyDiv.innerHTML = translationHistory.map(item => `
+                <div class="history-item">
+                    <strong>${item.timestamp}</strong><br>
+                    <p><strong>Original:</strong> ${item.original}</p>
+                    <p><strong>Translated:</strong> ${item.translated}</p>
+                    <audio controls src="${item.audio}"></audio>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html> 
