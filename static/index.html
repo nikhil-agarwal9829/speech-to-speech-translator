@@ -127,6 +127,21 @@
         .theme-toggle i {
             font-size: 20px;
         }
+        .language-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-right: 5px;
+        }
+        .language-name {
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        [data-theme="dark"] .language-label {
+            color: #aaa;
+        }
+        [data-theme="dark"] .language-name {
+            color: #81C784;
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -211,6 +226,19 @@
         recordButton.addEventListener('click', startRecording);
         stopButton.addEventListener('click', stopRecording);
 
+        // Add language mapping
+        const languageMap = {
+            'en': 'English',
+            'es': 'Spanish',
+            'fr': 'French',
+            'de': 'German',
+            'it': 'Italian',
+            'ja': 'Japanese',
+            'ko': 'Korean',
+            'ru': 'Russian',
+            'hi': 'Hindi'
+        };
+
         async function startRecording() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -278,8 +306,10 @@
 
         async function sendAudioForTranslation(audioBlob) {
             const formData = new FormData();
+            const inputLang = document.getElementById('input-language').value;
+            const outputLang = document.getElementById('output-language').value;
             formData.append('audio', audioBlob);
-            formData.append('target_lang', document.getElementById('output-language').value);
+            formData.append('target_lang', outputLang);
 
             try {
                 const response = await fetch('/translate', {
@@ -293,22 +323,32 @@
                     throw new Error(data.error);
                 }
 
-                // Add to history
+                // Add to history with language information
                 const timestamp = new Date().toLocaleString();
                 const historyItem = {
                     timestamp: timestamp,
                     original: data.original_text,
                     translated: data.translated_text,
-                    audio: data.audio_url
+                    audio: data.audio_url,
+                    inputLang: inputLang,
+                    outputLang: outputLang
                 };
                 
                 translationHistory.unshift(historyItem);
                 updateHistoryDisplay();
 
-                // Display current translation
+                // Display current translation with language information
                 outputDiv.innerHTML = `
                     <h3>Current Translation:</h3>
+                    <p>
+                        <span class="language-label">From:</span>
+                        <span class="language-name">${languageMap[inputLang]}</span>
+                    </p>
                     <p><strong>Original:</strong> ${data.original_text}</p>
+                    <p>
+                        <span class="language-label">To:</span>
+                        <span class="language-name">${languageMap[outputLang]}</span>
+                    </p>
                     <p><strong>Translated:</strong> ${data.translated_text}</p>
                     <audio controls src="${data.audio_url}"></audio>
                 `;
@@ -326,7 +366,15 @@
             historyDiv.innerHTML = translationHistory.map(item => `
                 <div class="history-item">
                     <strong>${item.timestamp}</strong><br>
+                    <p>
+                        <span class="language-label">From:</span>
+                        <span class="language-name">${languageMap[item.inputLang]}</span>
+                    </p>
                     <p><strong>Original:</strong> ${item.original}</p>
+                    <p>
+                        <span class="language-label">To:</span>
+                        <span class="language-name">${languageMap[item.outputLang]}</span>
+                    </p>
                     <p><strong>Translated:</strong> ${item.translated}</p>
                     <audio controls src="${item.audio}"></audio>
                 </div>
