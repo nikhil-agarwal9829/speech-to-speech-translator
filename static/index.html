@@ -142,6 +142,64 @@
         [data-theme="dark"] .language-name {
             color: #81C784;
         }
+        .language-selector {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            gap: 10px;
+        }
+        .language-selector select {
+            flex: 1;
+        }
+        .preview-button {
+            padding: 8px 12px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .preview-button:hover {
+            background-color: #1976D2;
+        }
+        .preview-button:disabled {
+            background-color: #BDBDBD;
+            cursor: not-allowed;
+        }
+        .language-flag {
+            width: 24px;
+            height: 16px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        .action-button {
+            padding: 5px 10px;
+            margin: 0 5px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .action-button:hover {
+            background-color: #1976D2;
+        }
+        .clear-history {
+            background-color: #f44336;
+            margin-top: 10px;
+        }
+        .clear-history:hover {
+            background-color: #d32f2f;
+        }
+        .copy-success {
+            color: #4CAF50;
+            margin-left: 5px;
+            display: none;
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -152,26 +210,36 @@
     <div class="container">
         <h1>Speech to Speech Translator</h1>
         <div class="controls">
-            <select id="input-language">
-                <option value="en">English</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <option value="de">German</option>
-                <option value="it">Italian</option>
-                <option value="ja">Japanese</option>
-                <option value="ko">Korean</option>
-                <option value="ru">Russian</option>
-            </select>
-            <select id="output-language">
-                <option value="hi">Hindi</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <option value="de">German</option>
-                <option value="it">Italian</option>
-                <option value="ja">Japanese</option>
-                <option value="ko">Korean</option>
-                <option value="ru">Russian</option>
-            </select>
+            <div class="language-selector">
+                <select id="input-language">
+                    <option value="en">🇺🇸 English</option>
+                    <option value="es">🇪🇸 Spanish</option>
+                    <option value="fr">🇫🇷 French</option>
+                    <option value="de">🇩🇪 German</option>
+                    <option value="it">🇮🇹 Italian</option>
+                    <option value="ja">🇯🇵 Japanese</option>
+                    <option value="ko">🇰🇷 Korean</option>
+                    <option value="ru">🇷🇺 Russian</option>
+                </select>
+                <button class="preview-button" onclick="previewLanguage('input')">
+                    <i class="fas fa-volume-up"></i> Preview
+                </button>
+            </div>
+            <div class="language-selector">
+                <select id="output-language">
+                    <option value="hi">🇮🇳 Hindi</option>
+                    <option value="es">🇪🇸 Spanish</option>
+                    <option value="fr">🇫🇷 French</option>
+                    <option value="de">🇩🇪 German</option>
+                    <option value="it">🇮🇹 Italian</option>
+                    <option value="ja">🇯🇵 Japanese</option>
+                    <option value="ko">🇰🇷 Korean</option>
+                    <option value="ru">🇷🇺 Russian</option>
+                </select>
+                <button class="preview-button" onclick="previewLanguage('output')">
+                    <i class="fas fa-volume-up"></i> Preview
+                </button>
+            </div>
             <button id="recordButton">Start Recording</button>
             <button id="stopButton" disabled>Stop Recording</button>
         </div>
@@ -183,6 +251,9 @@
         
         <div class="history-section">
             <h2>Translation History</h2>
+            <button class="action-button clear-history" onclick="clearHistory()">
+                <i class="fas fa-trash"></i> Clear History
+            </button>
             <div id="translation-history"></div>
         </div>
     </div>
@@ -300,8 +371,71 @@
 
             mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                await sendAudioForTranslation(audioBlob);
+                
+                // Convert to WAV format
+                const wavBlob = await convertToWav(audioBlob);
+                await sendAudioForTranslation(wavBlob);
             };
+        }
+
+        // Add WAV conversion function
+        async function convertToWav(audioBlob) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            
+            const wavBlob = await audioBufferToWav(audioBuffer);
+            return wavBlob;
+        }
+
+        function audioBufferToWav(audioBuffer) {
+            const numOfChan = audioBuffer.numberOfChannels;
+            const length = audioBuffer.length * numOfChan * 2;
+            const buffer = new ArrayBuffer(44 + length);
+            const view = new DataView(buffer);
+            const channels = [];
+            let offset = 0;
+            let pos = 0;
+
+            // Write WAV header
+            setUint32(0x000, 0x46464952); // "RIFF"
+            setUint32(0x004, 36 + length); // file length - 8
+            setUint32(0x008, 0x45564157); // "WAVE"
+            setUint32(0x00C, 0x20746D66); // "fmt "
+            setUint32(0x010, 16); // length of format chunk
+            setUint16(0x014, 0x0001); // PCM
+            setUint16(0x016, numOfChan);
+            setUint32(0x018, audioBuffer.sampleRate);
+            setUint32(0x01C, audioBuffer.sampleRate * 2 * numOfChan);
+            setUint16(0x020, numOfChan * 2);
+            setUint16(0x022, 16); // 16-bit
+            setUint32(0x024, 0x61746164); // "data"
+            setUint32(0x028, length);
+
+            // Write audio data
+            for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+                channels.push(audioBuffer.getChannelData(i));
+            }
+
+            while (pos < audioBuffer.length) {
+                for (let i = 0; i < numOfChan; i++) {
+                    let sample = Math.max(-1, Math.min(1, channels[i][pos]));
+                    sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                    view.setInt16(44 + offset, sample, true);
+                    offset += 2;
+                }
+                pos++;
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+
+            function setUint16(offset, value) {
+                view.setUint16(offset, value, true);
+            }
+
+            function setUint32(offset, value) {
+                view.setUint32(offset, value, true);
+            }
         }
 
         async function sendAudioForTranslation(audioBlob) {
@@ -365,7 +499,18 @@
         function updateHistoryDisplay() {
             historyDiv.innerHTML = translationHistory.map(item => `
                 <div class="history-item">
-                    <strong>${item.timestamp}</strong><br>
+                    <strong>${item.timestamp}</strong>
+                    <div class="action-buttons">
+                        <button class="action-button" onclick="copyToClipboard('${item.original}')">
+                            <i class="fas fa-copy"></i> Copy Original
+                        </button>
+                        <button class="action-button" onclick="copyToClipboard('${item.translated}')">
+                            <i class="fas fa-copy"></i> Copy Translation
+                        </button>
+                        <button class="action-button" onclick="downloadAudio('${item.audio}')">
+                            <i class="fas fa-download"></i> Download Audio
+                        </button>
+                    </div>
                     <p>
                         <span class="language-label">From:</span>
                         <span class="language-name">${languageMap[item.inputLang]}</span>
@@ -379,6 +524,68 @@
                     <audio controls src="${item.audio}"></audio>
                 </div>
             `).join('');
+        }
+
+        async function copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                const successMessage = document.createElement('span');
+                successMessage.className = 'copy-success';
+                successMessage.textContent = 'Copied!';
+                successMessage.style.display = 'inline';
+                event.target.parentNode.appendChild(successMessage);
+                setTimeout(() => {
+                    successMessage.style.display = 'none';
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+            }
+        }
+
+        function downloadAudio(audioUrl) {
+            const link = document.createElement('a');
+            link.href = audioUrl;
+            link.download = `translation_${new Date().toISOString()}.wav`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function clearHistory() {
+            if (confirm('Are you sure you want to clear the translation history?')) {
+                translationHistory = [];
+                updateHistoryDisplay();
+            }
+        }
+
+        // Add language preview functionality
+        async function previewLanguage(type) {
+            const langSelect = document.getElementById(`${type}-language`);
+            const langCode = langSelect.value;
+            const previewText = "Hello, this is a preview of the selected language.";
+            
+            try {
+                const response = await fetch('/preview', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        text: previewText,
+                        language: langCode
+                    })
+                });
+
+                const data = await response.json();
+                if (data.audio_url) {
+                    const audio = new Audio(data.audio_url);
+                    audio.play();
+                }
+            } catch (error) {
+                console.error('Preview error:', error);
+                statusDiv.textContent = 'Error playing preview';
+                statusDiv.className = 'status';
+            }
         }
     </script>
 </body>
